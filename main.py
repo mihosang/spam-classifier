@@ -26,26 +26,6 @@ from sklearn.base import BaseEstimator
 import gensim
 from gensim.models import word2vec
 
-class NBFeaturer(BaseEstimator):
-    def __init__(self, alpha):
-        self.alpha = alpha
-
-    def preprocess_x(self, x, r):
-        return x.multiply(r)
-
-    def pr(self, x, y_i, y):
-        p = x[y == y_i].sum(0)
-        return (p + self.alpha) / ((y == y_i).sum() + self.alpha)
-
-    def fit(self, x, y=None):
-        self._r = sparse.csr_matrix(np.log(self.pr(x, 1, y) / self.pr(x, 0, y)))
-        return self
-
-    def transform(self, x):
-        x_nb = self.preprocess_x(x, self._r)
-        return x_nb
-
-
 class Classifier():
 
     def __init__(self, model):
@@ -69,6 +49,8 @@ class Classifier():
         conf_mat = confusion_matrix(self.y_test, self.prediction)
         print(conf_mat)
 
+    def save_model(self, model_file):
+        joblib.dump(self.model, model_file)
 
 def import_spam_data(path):
     data = pd.read_csv(path, encoding='latin-1')
@@ -85,7 +67,8 @@ def import_phishing_data(path):
     data = pd.read_json(path)
     data = data.drop(["audioId"], axis=1)
     data['label'] = data.phishing.map({True:'spam', False: 'ham'})
-    print(data)
+    # print_data(data)
+    return data
 
 def print_data(data):
     print(data.head())
@@ -113,28 +96,13 @@ def get_document_term_matrix(X_train, X_test):
 
     return X_train_df, X_test_df
 
-def spam_model(model_file, training_contents, training_category):
-
-    # vect = TfidfVectorizer(use_idf=True)
-    vect = CountVectorizer()
-    mnb = MultinomialNB()
-    nb = NBFeaturer(1)
-
-    pip=Pipeline([('Vectorizer', vect), ('mnb', mnb)])
-    clf = pip.fit(training_contents, training_category)
-
-    joblib.dump(clf, model_file)
-
 if __name__ == "__main__":
-    # with open("./data/spam.csv", encoding='latin-1') as r:
-    #     text = r.readlines()
-    #     token = [s.split() for s in text]
-    # print(token)
-    import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-140559.json")
 
     print("Loading data")
     # STEP 1. Import & Prepare dataset
-    data = import_spam_data("./data/spam.csv")
+    # data = import_spam_data("./data/spam.csv")
+    data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-140559.json")
+
     # STEP 2. Split into Train & Test sets
     X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.2, random_state=10)
     # STEP 3. Text Transformation
@@ -142,31 +110,15 @@ if __name__ == "__main__":
     # STEP 4. Classifiers
     prediction = dict()
 
-    from konlpy.tag import Twitter
-
-    test_text = u'단독입찰보다 복수입찰의 경우'
-    nlp = Twitter()
-    print(nlp.morphs(test_text))
-    print(nlp.nouns(test_text))
-    print(nlp.phrases(test_text))
-    print(nlp.pos(test_text))
-
-    # exit(0)
     # STEP 4.1. MultinomialNB Classifier
     nb_classifier = Classifier(MultinomialNB())
     nb_classifier.train(X_train_df, y_train)
     nb_classifier.predict(X_test_df, y_test)
     prediction["Multinomial"] = nb_classifier.get_score()
 
-    # model_filename = 'spam_model_eng_mnb.pkl'
-    # spam_model(model_filename, X_train, y_train)
-    #
-    # clf = joblib.load(model_filename)
-    #
-    # print(clf.predict_proba(y_train))
-    # print(prediction)
+    nb_classifier.save_model("./data/nb_model.pkl")
+    # nb_classifier.print_report()
 
-    # exit(0)
     # STEP 4.2. Logistic Regression
     lr_classifier = Classifier(LogisticRegression())
     lr_classifier.train(X_train_df, y_train)
@@ -196,6 +148,6 @@ if __name__ == "__main__":
     svm_classifier.train(X_train_df, y_train)
     svm_classifier.predict(X_test_df, y_test)
     prediction["SVM"] = svm_classifier.get_score()
-    # nb_classifier.print_report()
+
     print(prediction)
 

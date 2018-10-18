@@ -1,17 +1,12 @@
 #!/usr/bin/env python
-import os
 
 import pandas as pd
-import numpy as np
 
 from nltk.corpus import stopwords
-from nltk.stem.snowball import SnowballStemmer
-from scipy import sparse
 
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-from sklearn.pipeline import Pipeline
 from sklearn.externals import joblib
 
 from sklearn.naive_bayes import MultinomialNB
@@ -20,11 +15,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.base import BaseEstimator
-
-#Word embedding
-import gensim
-from gensim.models import word2vec
 
 class Classifier():
 
@@ -77,20 +67,42 @@ def print_data(data):
     print(data.label.map({'ham': 0, 'spam': 1}))
     print(data.head())
 
+def tokenizer_korean(text):
+    pass
+
+def get_document_term_matrix_korean(X_train, X_test):
+    from konlpy.tag import Okt
+    t = Okt()
+
+    stopwords_korean = set()
+    with open("./data/stopwords-ko/ranksnl-korean.txt","r") as f:
+        temp = f.readlines()
+        for l in temp:
+            temp_morphs = t.morphs(l.strip('\r\n'))
+            for item in temp_morphs:
+                stopwords_korean.add(item)
+    with open("./data/stopwords-ko/ranksnl-korean.txt","r") as f:
+        temp = f.readlines()
+        temps = [l.strip('\r\n') for l in temp]
+
+    stopwords_korean = list(stopwords_korean)
+    print(temps)
+    print(stopwords_korean)
+
+    vect = CountVectorizer(stop_words=stopwords_korean, ngram_range=(1, 1))
+    vect.fit(X_train)
+    print(vect.vocabulary_)
+
+    X_train_df = vect.transform(X_train)
+    X_test_df = vect.transform(X_test)
+
+    return X_train_df, X_test_df
 
 def get_document_term_matrix(X_train, X_test):
-    # vect = CountVectorizer(stop_words=stopwords.words('english'))
-    vect = CountVectorizer()
-    # vect = TfidfVectorizer(stop_words=stopwords.words('english'))
-    # vect.fit(X_train)
-    dtm = vect.fit_transform(X_train)
-    print(
-        'fit_transform, (sentence {}, feature {})'.format(dtm.shape[0], dtm.shape[1])
-    )
-    print(dtm.toarray())
-    print(vect.get_feature_names())
-    print(vect.get_stop_words())
-    print(vect.get_params())
+
+    vect = CountVectorizer(stop_words=stopwords.words('english'))
+    vect.fit(X_train)
+
     X_train_df = vect.transform(X_train)
     X_test_df = vect.transform(X_test)
 
@@ -101,12 +113,13 @@ if __name__ == "__main__":
     print("Loading data")
     # STEP 1. Import & Prepare dataset
     # data = import_spam_data("./data/spam.csv")
-    data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-140559.json")
+    data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-184447.json")
 
     # STEP 2. Split into Train & Test sets
     X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.2, random_state=10)
     # STEP 3. Text Transformation
-    X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
+    # X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
+    X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
     # STEP 4. Classifiers
     prediction = dict()
 
@@ -120,7 +133,7 @@ if __name__ == "__main__":
     # nb_classifier.print_report()
 
     # STEP 4.2. Logistic Regression
-    lr_classifier = Classifier(LogisticRegression())
+    lr_classifier = Classifier(LogisticRegression(solver='liblinear'))
     lr_classifier.train(X_train_df, y_train)
     lr_classifier.predict(X_test_df, y_test)
     prediction["LogisticRegression"] = lr_classifier.get_score()
@@ -132,7 +145,7 @@ if __name__ == "__main__":
     prediction["k-NN"] = knn_classifier.get_score()
 
     # STEP 4.4. Random Forest Classifier
-    rf_classifier = Classifier(RandomForestClassifier())
+    rf_classifier = Classifier(RandomForestClassifier(n_estimators=100))
     rf_classifier.train(X_train_df, y_train)
     rf_classifier.predict(X_test_df, y_test)
     prediction["RandomForest"] = rf_classifier.get_score()
@@ -144,7 +157,7 @@ if __name__ == "__main__":
     prediction["AdaBoost"] = ab_classifier.get_score()
 
     # STEP 4.5. SVN
-    svm_classifier = Classifier(SVC())
+    svm_classifier = Classifier(SVC(gamma='auto'))
     svm_classifier.train(X_train_df, y_train)
     svm_classifier.predict(X_test_df, y_test)
     prediction["SVM"] = svm_classifier.get_score()

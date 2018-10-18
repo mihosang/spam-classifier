@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-
+from pprint import pprint
 import pandas as pd
 
 from nltk.corpus import stopwords
 
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from sklearn.externals import joblib
@@ -112,55 +112,32 @@ if __name__ == "__main__":
 
     print("Loading data")
     # STEP 1. Import & Prepare dataset
-    # data = import_spam_data("./data/spam.csv")
-    data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-184447.json")
+    data = import_spam_data("./data/spam.csv")
+    # data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-184447.json")
 
     # STEP 2. Split into Train & Test sets
     X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.2, random_state=10)
     # STEP 3. Text Transformation
-    # X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
-    X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
+    X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
+    # X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
     # STEP 4. Classifiers
-    prediction = dict()
 
-    # STEP 4.1. MultinomialNB Classifier
-    nb_classifier = Classifier(MultinomialNB())
-    nb_classifier.train(X_train_df, y_train)
-    nb_classifier.predict(X_test_df, y_test)
-    prediction["Multinomial"] = nb_classifier.get_score()
+    all_models = [
+        ("Multinomial", MultinomialNB()),
+        ("LogisticRegression", LogisticRegression(solver='liblinear')),
+        ("k-NN", KNeighborsClassifier(n_neighbors=5)),
+        ("RandomForest",RandomForestClassifier(n_estimators=100)),
+        ("Adaboost",AdaBoostClassifier()),
+        ("C-SVC",SVC(gamma='auto'))
 
-    nb_classifier.save_model("./data/nb_model.pkl")
-    # nb_classifier.print_report()
+    ]
+    
+    scores = dict()
+    for model in all_models:
+        classifier = Classifier(model[1])
+        classifier.train(X_train_df, y_train)
+        classifier.predict(X_test_df, y_test)
+        classifier.save_model("./data/%s-model.pkl" % model[0])
+        scores[model[0]] = classifier.get_score()
 
-    # STEP 4.2. Logistic Regression
-    lr_classifier = Classifier(LogisticRegression(solver='liblinear'))
-    lr_classifier.train(X_train_df, y_train)
-    lr_classifier.predict(X_test_df, y_test)
-    prediction["LogisticRegression"] = lr_classifier.get_score()
-
-    # STEP 4.3. k-NN Classifier
-    knn_classifier = Classifier(KNeighborsClassifier(n_neighbors=5))
-    knn_classifier.train(X_train_df, y_train)
-    knn_classifier.predict(X_test_df, y_test)
-    prediction["k-NN"] = knn_classifier.get_score()
-
-    # STEP 4.4. Random Forest Classifier
-    rf_classifier = Classifier(RandomForestClassifier(n_estimators=100))
-    rf_classifier.train(X_train_df, y_train)
-    rf_classifier.predict(X_test_df, y_test)
-    prediction["RandomForest"] = rf_classifier.get_score()
-
-    # STEP 4.4. Adaboost
-    ab_classifier = Classifier(AdaBoostClassifier())
-    ab_classifier.train(X_train_df, y_train)
-    ab_classifier.predict(X_test_df, y_test)
-    prediction["AdaBoost"] = ab_classifier.get_score()
-
-    # STEP 4.5. SVN
-    svm_classifier = Classifier(SVC(gamma='auto'))
-    svm_classifier.train(X_train_df, y_train)
-    svm_classifier.predict(X_test_df, y_test)
-    prediction["SVM"] = svm_classifier.get_score()
-
-    print(prediction)
-
+    pprint(scores)

@@ -128,16 +128,15 @@ if __name__ == "__main__":
         ("k-NN", KNeighborsClassifier(n_neighbors=5)),
         ("RandomForest",RandomForestClassifier(n_estimators=100)),
         ("Adaboost",AdaBoostClassifier()),
-        ("C-SVC",SVC(gamma='auto'))
-
+        ("C-SVC",SVC(kernel='linear'))
     ]
-    
-    scores = dict()
+
+    scores = []
     for model in all_models:
         classifier = Classifier(model[1])
         classifier.train(X_train_df, y_train)
         classifier.predict(X_test_df, y_test)
         classifier.save_model("./data/%s-model.pkl" % model[0])
-        scores[model[0]] = classifier.get_score()
-
-    pprint(scores)
+        scores.append({"model":model[0], "score": float(classifier.get_score())})
+    sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)
+    pprint(sorted_scores)

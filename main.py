@@ -1,8 +1,8 @@
 #!/usr/bin/env python
+import json
 from pprint import pprint
 import pandas as pd
-
-from nltk.corpus import stopwords
+from konlpy.tag import Okt
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -15,6 +15,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
+
+okt = Okt()
 
 class Classifier():
 
@@ -49,16 +51,40 @@ def import_spam_data(path):
     data = data.rename(columns={"v1": "label", "v2": "text"})
     # convert label to a numerical variable
     data['label_num'] = data.label.map({'ham': 0, 'spam': 1})
-
     # print_data(data)
     return data
 
-def import_phishing_data(path):
-    data = pd.read_json(path)
-    data = data.drop(["audioId"], axis=1)
-    data['label'] = data.phishing.map({True:'spam', False: 'ham'})
+def import_phishing_nouns(path):
+    sentences = []
+    label = []
+    with open(path,encoding='utf-8') as f:
+        lines = json.load(f)
+        for raw in lines:
+            item = dict()
+            if raw['phishing'] is True:
+                item['label'] = 'spam'
+            else:
+                item['label'] = 'ham'
+            # item['text'] = raw['text']
+            item['text'] = tokenize(raw['text'])
+            sentences.append(item)
+
+    data = pd.DataFrame(sentences)
     # print_data(data)
     return data
+
+def import_phishing_data(paths):
+    dataset = None
+    for path in paths:
+        data = pd.read_json(path, encoding='utf-8')
+        data['label'] = data.phishing.map({True: 'spam', False: 'ham'})
+        data = data.drop(["audioId"], axis=1)
+        print(data.phishing.value_counts())
+        if dataset is None:
+            dataset = data
+        else:
+            dataset = pd.concat([dataset, data])
+    return dataset
 
 def print_data(data):
     print(data.head())
@@ -67,31 +93,25 @@ def print_data(data):
     print(data.label.map({'ham': 0, 'spam': 1}))
     print(data.head())
 
-def tokenizer_korean(text):
-    pass
+def tokenize(text):
+    sentence = ''
+    for t in okt.nouns(text):
+        sentence += ' '+t
+    return sentence
 
 def get_document_term_matrix_korean(X_train, X_test):
-    from konlpy.tag import Okt
-    t = Okt()
-
     stopwords_korean = set()
     with open("./data/stopwords-ko/ranksnl-korean.txt","r") as f:
         temp = f.readlines()
         for l in temp:
-            temp_morphs = t.morphs(l.strip('\r\n'))
+            temp_morphs = okt.morphs(l.strip('\r\n'))
             for item in temp_morphs:
                 stopwords_korean.add(item)
-    with open("./data/stopwords-ko/ranksnl-korean.txt","r") as f:
-        temp = f.readlines()
-        temps = [l.strip('\r\n') for l in temp]
-
     stopwords_korean = list(stopwords_korean)
-    print(temps)
-    print(stopwords_korean)
 
-    vect = CountVectorizer(stop_words=stopwords_korean, ngram_range=(1, 1))
+    # vect = CountVectorizer(stop_words=stopwords_korean, ngram_range=(1, 1))
+    vect = CountVectorizer()
     vect.fit(X_train)
-    print(vect.vocabulary_)
 
     X_train_df = vect.transform(X_train)
     X_test_df = vect.transform(X_test)
@@ -99,8 +119,8 @@ def get_document_term_matrix_korean(X_train, X_test):
     return X_train_df, X_test_df
 
 def get_document_term_matrix(X_train, X_test):
-
-    vect = CountVectorizer(stop_words=stopwords.words('english'))
+    # vect = CountVectorizer(stop_words=stopwords.words('english'), ngram_range=(1,1))
+    vect = TfidfVectorizer()
     vect.fit(X_train)
 
     X_train_df = vect.transform(X_train)
@@ -112,14 +132,18 @@ if __name__ == "__main__":
 
     print("Loading data")
     # STEP 1. Import & Prepare dataset
-    data = import_spam_data("./data/spam.csv")
-    # data = import_phishing_data("./mldataset/phishing/abnormal/fishing-2018-10-17-184447.json")
+    # data = import_spam_data("./data/spam.csv")
+    data = import_phishing_data([
+        "./mldataset/phishing/abnormal/fishing-2018-10-18-161054.json",
+        "./mldataset/phishing/normal/normal-2018-10-18-210902.json"
+    ])
+
 
     # STEP 2. Split into Train & Test sets
     X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.2, random_state=10)
     # STEP 3. Text Transformation
-    X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
-    # X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
+    # X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
+    X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
     # STEP 4. Classifiers
 
     all_models = [
@@ -138,5 +162,6 @@ if __name__ == "__main__":
         classifier.predict(X_test_df, y_test)
         classifier.save_model("./data/%s-model.pkl" % model[0])
         scores.append({"model":model[0], "score": float(classifier.get_score())})
+
     sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)
     pprint(sorted_scores)

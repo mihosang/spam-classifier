@@ -1,2 +1,14 @@
+Flask==1.0.2
+Flask-RESTful==0.3.6
+gensim==3.6.0
+gunicorn==19.9.0
+JPype1==0.6.3
+konlpy==0.5.1
+nltk==3.3
+numpy==1.15.2
 pandas==0.23.4
 scikit-learn==0.20.0
+scipy==1.1.0
+sklearn==0.0
+sklearn-porter==0.6.2
+xgboost==0.80

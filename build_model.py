@@ -109,7 +109,8 @@ if __name__ == "__main__":
     # STEP 1. Import & Prepare dataset
     # data = import_spam_data("./data/spam.csv")
     data = import_phishing_data([
-        "./mldataset/phishing/abnormal/fishing-2018-10-18-161054.json",
+        "./mldataset/phishing/abnormal/phishing-2018-10-18-161054.json",
+        "./mldataset/phishing/abnormal/phishing-meta-2018-10-23-115644.json",
         "./mldataset/phishing/normal/normal-2018-10-18-210902.json"
     ])
 

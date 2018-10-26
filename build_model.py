@@ -3,6 +3,7 @@ import json
 from pprint import pprint
 
 import pandas as pd
+import numpy as np
 from konlpy.tag import Okt
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -36,9 +37,9 @@ def import_phishing_nouns(path):
         for raw in lines:
             item = dict()
             if raw['phishing'] is True:
-                item['label'] = 'spam'
+                item['label'] = 'phishing'
             else:
-                item['label'] = 'ham'
+                item['label'] = 'normal'
             # item['text'] = raw['text']
             item['text'] = tokenize(raw['text'])
             sentences.append(item)
@@ -48,12 +49,17 @@ def import_phishing_nouns(path):
     return data
 
 def import_phishing_data(paths):
+    if len(paths) == 0:
+        print("ERROR: Empty input file paths")
+        return pd.DataFrame()
     dataset = None
     for path in paths:
         data = pd.read_json(path, encoding='utf-8')
-        data['label'] = data.phishing.map({True: 'spam', False: 'ham'})
+        data['label'] = data.phishing.map({True: 'phishing', False: 'normal'})
         data = data.drop(["audioId"], axis=1)
-        print(data.phishing.value_counts())
+        data = data.take(np.random.permutation(len(data))[:1000])
+        # data = data[:1000] if len(data) > 1000 else data
+        print("len(data) = %s" % len(data))
         if dataset is None:
             dataset = data
         else:
@@ -64,7 +70,7 @@ def print_data(data):
     print(data.head())
     print(data.tail())
     print(data.label.value_counts())
-    print(data.label.map({'ham': 0, 'spam': 1}))
+    print(data.label.map({'normal': 0, 'phishing': 1}))
     print(data.head())
 
 def tokenize(text):
@@ -137,6 +143,7 @@ if __name__ == "__main__":
         classifier.train(X_train_df, y_train)
         classifier.predict(X_test_df, y_test)
         classifier.save_model(vect, "./data/%s-model.pkl" % model[0])
+        classifier.print_report()
         scores.append({"model":model[0], "score": float(classifier.get_score())})
 
     sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)

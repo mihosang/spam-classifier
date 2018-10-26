@@ -19,11 +19,11 @@ class Classifier():
         return self.score
 
     def print_report(self):
+        print("Report for classifier %s" % self.model)
         print(" 1. Classification Report")
         print(classification_report(self.y_test, self.prediction, target_names=["Ham", "Spam"]))
         print(" 2. Confusion Report")
-        conf_mat = confusion_matrix(self.y_test, self.prediction)
-        print(conf_mat)
+        print(confusion_matrix(self.y_test, self.prediction))
 
     def save_model(self, vect, model_file):
         self.model_file = model_file

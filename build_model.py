@@ -57,7 +57,7 @@ def import_phishing_data(paths):
         data = pd.read_json(path, encoding='utf-8')
         data['label'] = data.phishing.map({True: 'phishing', False: 'normal'})
         data = data.drop(["audioId"], axis=1)
-        data = data.take(np.random.permutation(len(data))[:1000])
+        # data = data.take(np.random.permutation(len(data))[:1000])
         # data = data[:1000] if len(data) > 1000 else data
         print("len(data) = %s" % len(data))
         if dataset is None:
@@ -92,21 +92,18 @@ def get_document_term_matrix_korean(X_train, X_test):
     # vect = CountVectorizer(stop_words=stopwords_korean, ngram_range=(1, 1))
     vect = CountVectorizer()
     vect.fit(X_train)
+
     joblib.dump(vect, 'vectorizer.joblib')
 
     X_train_df = vect.transform(X_train)
     X_test_df = vect.transform(X_test)
-
-    return vect, X_train_df, X_test_df
-
-def get_document_term_matrix(X_train, X_test):
-    # vect = CountVectorizer(stop_words=stopwords.words('english'), ngram_range=(1,1))
-    vect = TfidfVectorizer()
-    vect.fit(X_train)
-
-    X_train_df = vect.transform(X_train)
-    X_test_df = vect.transform(X_test)
-
+    # print(vect.get_feature_names())
+    # print(vect.get_params())
+    # print(vect2.get_feature_names())
+    # print(vect2.get_params())
+    # print(X_train_df)
+    # print(vect.inverse_transform(X_train_df))
+    # print(vect2.transform(X_train))
     return vect, X_train_df, X_test_df
 
 if __name__ == "__main__":
@@ -122,19 +119,18 @@ if __name__ == "__main__":
 
 
     # STEP 2. Split into Train & Test sets
-    X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.2, random_state=10)
+    X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.3, random_state=10)
     # STEP 3. Text Transformation
-    # vect, X_train_df, X_test_df = get_document_term_matrix(X_train, X_test)
     vect, X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
+    # exit()
     # STEP 4. Classifiers
-
     all_models = [
         ("Multinomial", MultinomialNB()),
         ("LogisticRegression", LogisticRegression(solver='liblinear')),
         ("k-NN", KNeighborsClassifier(n_neighbors=5)),
         ("RandomForest",RandomForestClassifier(n_estimators=100)),
         ("Adaboost",AdaBoostClassifier()),
-        ("C-SVC",SVC(kernel='linear'))
+        ("C-SVC",SVC(kernel='linear',probability=True))
     ]
 
     scores = []
@@ -143,7 +139,7 @@ if __name__ == "__main__":
         classifier.train(X_train_df, y_train)
         classifier.predict(X_test_df, y_test)
         classifier.save_model(vect, "./data/%s-model.pkl" % model[0])
-        classifier.print_report()
+        # classifier.print_report()
         scores.append({"model":model[0], "score": float(classifier.get_score())})
 
     sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)

@@ -1,7 +1,6 @@
-import os
-import signal
-import time
 import asyncio
+import os
+import time
 
 from sklearn.externals import joblib
 from slackclient import SlackClient
@@ -32,7 +31,9 @@ class Bot(object):
                 print(user_id, text, channel)
                 x_test = self.vect.transform([text])
                 predict = self.clf.predict(x_test)
-                reply_message = "피싱 같습니다" if predict == "spam" else "정상 대화 같네요"
+                predict_proba = self.clf.predict_proba(x_test)[0][0]
+                reply_message = "피싱 같습니다 " if predict == "phishing" else "정상 대화 같네요 "
+                reply_message += "[예측확률 : %.2f" % float(predict_proba * 100) + "%]"
                 self.slack_client.rtm_send_message(channel, reply_message)
 
 
@@ -47,10 +48,9 @@ class Bot(object):
         else:
             exit("Error, Connection Failed")
 
-
 if __name__ == "__main__":
     bot = Bot()
     loop = asyncio.get_event_loop()
-    
+
     loop.run_until_complete(bot.listen())
     loop.run_forever()

@@ -22,7 +22,6 @@ class Bot(object):
 
     async def parse_bot_commands(self, slack_events):
         for event in slack_events:
-            print(event)
             if not "type" in event:
                 return
             if event['type'] == 'message' and not "subtype" in event:
@@ -31,9 +30,11 @@ class Bot(object):
                 print(user_id, text, channel)
                 x_test = self.vect.transform([text])
                 predict = self.clf.predict(x_test)
-                predict_proba = self.clf.predict_proba(x_test)[0][0]
+
+                predict_proba = self.clf.predict_proba(x_test)
+                f_predict_proba = "%.2f" % float(predict_proba[0][1]*100) if predict == "phishing" else "%.2f" % float(predict_proba[0][0]*100)
                 reply_message = "피싱 같습니다 " if predict == "phishing" else "정상 대화 같네요 "
-                reply_message += "[예측확률 : %.2f" % float(predict_proba * 100) + "%]"
+                reply_message += "[예측확률 : %.2f" % float(f_predict_proba) + "%]"
                 self.slack_client.rtm_send_message(channel, reply_message)
 
 

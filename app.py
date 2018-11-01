@@ -19,10 +19,10 @@ class PredictionResource(Resource):
 
             x_test = self.vect.transform([text])
             predict = self.clf.predict(x_test)
-            predict_proba = self.clf.predict_proba(x_test)[0][0]
-            f_predict_proba = "%.2f" % float(predict_proba)
-
-            return jsonify({"result": predict[0], "probability": f_predict_proba})
+            predict_proba = self.clf.predict_proba(x_test)
+            f_predict_proba = "%.2f" % float(predict_proba[0][1]*100) if predict == "phishing" else "%.2f" % float(predict_proba[0][0]*100)
+            print(predict, f_predict_proba)
+            return jsonify({"result": predict[0], "probability": str(f_predict_proba + "%")})
         except:
             return jsonify({"error": "unknown error"})
 

@@ -8,7 +8,7 @@ class Classifier():
         self.model = model
 
     def train(self, x_train, y_train):
-        self.model.fit(x_train, y_train)
+        return self.model.fit(x_train, y_train)
 
     def predict(self, x_test, y_test):
         self.y_test = y_test
@@ -25,6 +25,6 @@ class Classifier():
         print(" 2. Confusion Report")
         print(confusion_matrix(self.y_test, self.prediction))
 
-    def save_model(self, vect, model_file):
+    def save_model(self, model_file):
         self.model_file = model_file
         joblib.dump(self.model, model_file)

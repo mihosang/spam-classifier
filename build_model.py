@@ -2,41 +2,63 @@
 import json
 from pprint import pprint
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from gensim.models import word2vec
 from konlpy.tag import Okt
-from sklearn.ensemble import AdaBoostClassifier, ExtraTreesClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.externals import joblib
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from classifier import Classifier
 
-okt = Okt()
+def make_wordvector(sentences):
+    import multiprocessing
+    cores = multiprocessing.cpu_count()
+
+    num_features = 300  # 문자 벡터 차원 수
+    min_word_count = 2  # 최소 단어 수
+    num_workers = cores  # 병렬 처리 스레드 수
+    context = 10  # 주변 단어 몇개까지
+
+    model = word2vec.Word2Vec(sentences,
+                              workers=num_workers,
+                              size=num_features,
+                              min_count=min_word_count,
+                              window=context,
+                              sg=1)
+    return model
+
 
 # tokenizer : 문장에서 색인어 추출을 위해 명사,동사,알파벳,숫자 정도의 단어만 뽑아서 normalization, stemming 처리하도록 함
-def tokenizer(raw, pos=["Noun", "Verb"], stopword={}):
+def tokenizer(raw, pos={"Noun", "Verb"}, stopword={}):
+    okt = Okt(max_heap_size=4096)
     return [
         word for word, tag in okt.pos(
             raw,
             norm=True,  # normalize 그랰ㅋㅋ -> 그래ㅋㅋ
             stem=True  # stemming 바뀌나->바뀌다
         )
-        if tag in pos and word not in stopword
+        if len(word) > 1 and tag in pos and word not in stopword
     ]
 
+
 def get_stopword():
+    okt = Okt(max_heap_size=4096)
     filelist = [
         "./data/stopwords-ko/geonetwork-kor.txt",
         "./data/stopwords-ko/gh-stopwords-json-ko.txt",
         "./data/stopwords-ko/ranksnl-korean.txt"
     ]
-    stopwords_korean = {"음", "네네", "상담원"}
+    stopwords_korean = {
+        "여보세요","에스","케이","음", "네네", "상담원", "span", "color", "blue", "weight", "font","고객님","감사합니다","알겠습니다",
+        "고맙습니다","상담사","되세요","지금", "제가", "입니다", "번호가", "bold","style","하다", "고객", "되다", "번호", "감사하다","이다","요금","알다"
+    }
     for filename in filelist:
         with open(filename, "r") as f:
             temp = f.readlines()
@@ -44,17 +66,16 @@ def get_stopword():
                 stopwords_korean.update(okt.morphs(l.strip('\r\n')))
     return stopwords_korean
 
+
 def import_phishing_nouns(paths):
     _stopword = get_stopword()
     dataset = None
-
     for path in paths:
-        with open(path,encoding='utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             lines = json.load(f)
             sentences = []
-
             for raw in lines:
-                item ={}
+                item = {}
                 item['label'] = 'phishing' if raw['phishing'] is True else 'normal'
                 item['text'] = ' '.join(tokenizer(raw['text'], stopword=_stopword))
                 sentences.append(item)
@@ -65,8 +86,9 @@ def import_phishing_nouns(paths):
         if dataset is None:
             dataset = data
         else:
-            dataset = pd.concat([dataset, data],sort=False)
+            dataset = pd.concat([dataset, data], sort=False)
     return dataset
+
 
 def import_phishing_data(paths):
     if len(paths) == 0:
@@ -77,13 +99,14 @@ def import_phishing_data(paths):
         data = pd.read_json(path, encoding='utf-8')
         data['label'] = data.phishing.map({True: 'phishing', False: 'normal'})
         data = data.drop(["audioId"], axis=1)
-        # data = data.take(np.random.permutation(len(data))[:1000])
+        # data = data.take(np.random.permutation(len(data))[:500])
         print("len(data) = %s" % len(data))
         if dataset is None:
             dataset = data
         else:
-            dataset = pd.concat([dataset, data],sort=False)
+            dataset = pd.concat([dataset, data], sort=False)
     return dataset
+
 
 def print_data(data):
     print(data.head())
@@ -92,9 +115,10 @@ def print_data(data):
     print(data.label.map({'normal': 0, 'phishing': 1}))
     print(data.head())
 
+
 def get_document_term_matrix_korean(X_train, X_test):
-    vect = CountVectorizer()
-    # vect = TfidfVectorizer(lowercase=False,tokenizer=tokenizer)
+    # vect = CountVectorizer(tokenizer=tokenizer,lowercase=False, ngram_range=(1,2))
+    vect = TfidfVectorizer(lowercase=False,tokenizer=tokenizer)
     vect.fit(X_train)
 
     joblib.dump(vect, 'vectorizer.joblib')
@@ -102,36 +126,38 @@ def get_document_term_matrix_korean(X_train, X_test):
     X_train_df = vect.transform(X_train)
     X_test_df = vect.transform(X_test)
 
+    X = vect.fit_transform(X_train)
+    print('sentences {} feature {}'.format(X.shape[0], X.shape[1]))
+
+    feature = vect.get_feature_names()
+    # print(feature)
     return X_train_df, X_test_df
+
 
 if __name__ == "__main__":
 
     print("Loading data")
     # STEP 1. Import & Prepare dataset
-    data = import_phishing_nouns([
+    data = import_phishing_data([
         "./mldataset/phishing/abnormal/phishing-2018-10-18-161054.json",
         "./mldataset/phishing/abnormal/phishing-meta-2018-10-23-115644.json",
-        "./mldataset/phishing/normal/logo.csv-AsBoolean.json"
+        # "./mldataset/phishing/normal/logo.csv-AsBoolean.json",
+        "./mldataset/phishing/normal/txt_20180711.final.json"
         # "./mldataset/phishing/normal/normal-2018-10-18-210902.json"
     ])
 
     # STEP 2. Split into Train & Test sets
-    print("STEP 2")
     X_train, X_test, y_train, y_test = train_test_split(data["text"], data["label"], test_size=0.3, random_state=10)
-    print("STEP 3")
     # STEP 3. Text Transformation
     X_train_df, X_test_df = get_document_term_matrix_korean(X_train, X_test)
-    print("STEP 4")
     # STEP 4. Classifiers
     all_models = [
         ("Multinomial", MultinomialNB()),
         ("LogisticRegression", LogisticRegression(solver='liblinear')),
-        ("k-NN", KNeighborsClassifier(n_neighbors=5)),
-        ("RandomForest",RandomForestClassifier(n_estimators=100)),
-        ("Adaboost",AdaBoostClassifier()),
-        ("C-SVC",SVC(kernel='linear',probability=True))
+        ("RandomForest", RandomForestClassifier(n_estimators=100)),
+        ("Adaboost", AdaBoostClassifier()),
+        ("C-SVC", SVC(kernel='linear', probability=True))
     ]
-    all_models = []
     scores = []
     for model in all_models:
         classifier = Classifier(model[1])
@@ -139,7 +165,7 @@ if __name__ == "__main__":
         classifier.predict(X_test_df, y_test)
         classifier.save_model("./data/%s-model.pkl" % model[0])
         # classifier.print_report()
-        scores.append({"model":model[0], "score": float(classifier.get_score())})
+        scores.append({"model": model[0], "score": float(classifier.get_score())})
 
     sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)
     pprint(sorted_scores)
@@ -158,4 +184,5 @@ if __name__ == "__main__":
     # for f in range(X_train_df.shape[1]):
     vect = joblib.load('vectorizer.joblib')
     for f in range(10):
-        print("%d. feature %d %s (%f)" % (f + 1, indices[f], vect.get_feature_names()[indices[f]],importances[indices[f]]))
+        print("%d. feature %d %s (%f)" % (f + 1, indices[f], vect.get_feature_names()[indices[f]], importances[indices[f]]))
+

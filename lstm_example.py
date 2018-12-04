@@ -1,5 +1,5 @@
 import pandas as pd
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers import LSTM, Activation, Dense, Dropout, Input, Embedding
 from keras.models import Model
 from keras.optimizers import RMSprop
@@ -46,6 +46,7 @@ if __name__ == "__main__":
     data = import_phishing_data([
         "./mldataset/phishing/abnormal/phishing-2018-10-18-161054.json",
         "./mldataset/phishing/abnormal/phishing-meta-2018-10-23-115644.json",
+        "mldataset/phishing/normal/txt_20180711.final.json",
         "./mldataset/phishing/normal/logo.csv-AsBoolean.json",
         "./mldataset/phishing/normal/normal-2018-10-18-210902.json"
     ])
@@ -57,6 +58,7 @@ if __name__ == "__main__":
     sequences = tok.texts_to_sequences(X_train)
     sequences_matrix = sequence.pad_sequences(sequences, maxlen=max_len)
     print(sequences_matrix.shape)
+
     model.summary()
     model.compile(loss='binary_crossentropy',optimizer=RMSprop(),metrics=['accuracy'])
     model.fit(sequences_matrix, y_train, batch_size=128, epochs=10,
@@ -67,3 +69,12 @@ if __name__ == "__main__":
 
     accr = model.evaluate(test_sequences_matrix,y_test)
     print('Test set\n  Loss: {:0.3f}\n  Accuracy: {:0.3f}'.format(accr[0], accr[1]))
+
+    # save model and tokenizer
+    import pickle
+    with open('data/model/tokenizer.pickle', 'wb') as handle:
+        pickle.dump(tok, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    model_json = model.to_json()
+    with open('data/model/lstm_model.json','w') as handle:
+        handle.write(model_json)
+    model.save_weights('data/model/lstm_model.h5')

@@ -6,16 +6,15 @@ import numpy as np
 import pandas as pd
 from gensim.models import word2vec
 from konlpy.tag import Okt
-from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.externals import joblib
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 
 from classifier import Classifier
+
 
 def make_wordvector(sentences):
     import multiprocessing
@@ -76,7 +75,7 @@ def import_phishing_nouns(paths):
             sentences = []
             for raw in lines:
                 item = {}
-                item['label'] = 'phishing' if raw['phishing'] is True else 'normal'
+                item['label'] = 1 if raw['phishing'] is True else 0
                 item['text'] = ' '.join(tokenizer(raw['text'], stopword=_stopword))
                 sentences.append(item)
 
@@ -97,7 +96,7 @@ def import_phishing_data(paths):
     dataset = None
     for path in paths:
         data = pd.read_json(path, encoding='utf-8')
-        data['label'] = data.phishing.map({True: 'phishing', False: 'normal'})
+        data['label'] = data.phishing.map({True: 1, False: 0})
         data = data.drop(["audioId"], axis=1)
         # data = data.take(np.random.permutation(len(data))[:500])
         print("len(data) = %s" % len(data))
@@ -121,7 +120,7 @@ def get_document_term_matrix_korean(X_train, X_test):
     vect = TfidfVectorizer(lowercase=False,tokenizer=tokenizer)
     vect.fit(X_train)
 
-    joblib.dump(vect, 'vectorizer.joblib')
+    joblib.dump(vect, 'data/model/vectorizer.joblib')
 
     X_train_df = vect.transform(X_train)
     X_test_df = vect.transform(X_test)
@@ -153,9 +152,9 @@ if __name__ == "__main__":
     # STEP 4. Classifiers
     all_models = [
         ("Multinomial", MultinomialNB()),
-        ("LogisticRegression", LogisticRegression(solver='liblinear')),
-        ("RandomForest", RandomForestClassifier(n_estimators=100)),
-        ("Adaboost", AdaBoostClassifier()),
+        # ("LogisticRegression", LogisticRegression(solver='liblinear')),
+        # ("RandomForest", RandomForestClassifier(n_estimators=100)),
+        # ("Adaboost", AdaBoostClassifier()),
         ("C-SVC", SVC(kernel='linear', probability=True))
     ]
     scores = []
@@ -164,7 +163,7 @@ if __name__ == "__main__":
         classifier.train(X_train_df, y_train)
         classifier.predict(X_test_df, y_test)
         classifier.save_model("./data/%s-model.pkl" % model[0])
-        # classifier.print_report()
+        classifier.print_report()
         scores.append({"model": model[0], "score": float(classifier.get_score())})
 
     sorted_scores = sorted(scores, key=lambda k: k['score'], reverse=True)

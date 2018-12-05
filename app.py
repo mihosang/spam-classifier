@@ -13,9 +13,6 @@ max_len = 150
 app = Flask(__name__)
 api = Api(app)
 
-
-
-
 class PredictionResource(Resource):
     def __init__(self):
         with open('data/model/lstm_model.json', 'r') as handle:
@@ -26,7 +23,6 @@ class PredictionResource(Resource):
             self.tok = pickle.load(handle)
         self.svc_model = joblib.load('data/model/C-SVC-model.pkl')
         self.vect = joblib.load('data/model/vectorizer.joblib')
-
 
     def svc_predict(self, text):
         x_test = self.vect.transform(text)
@@ -40,7 +36,7 @@ class PredictionResource(Resource):
         return predict, l_predict_proba
 
     def lstm_predict(self, text):
-        from keras import backend as K
+
         sequence_matrix = sequence.pad_sequences(self.tok.texts_to_sequences(text), maxlen=max_len)
         prediction = self.model.predict(sequence_matrix)
         l_predict_proba = []
@@ -48,7 +44,7 @@ class PredictionResource(Resource):
             l_predict_proba.append(prediction[i][0])
         predict = ["phishing" if x > 0.5 else "normal" for x in l_predict_proba]
         l_predict_proba = [str(x) for x in l_predict_proba]
-        K.clear_session()
+
         return predict, l_predict_proba
 
     def post(self):
@@ -69,19 +65,26 @@ class PredictionResource(Resource):
 
             if model == 'svc':
                 svc_predict, svc_predict_proba = self.svc_predict(l_text)
-                return jsonify({"result": svc_predict, "probability": svc_predict_proba})
+                result = jsonify({"result": svc_predict, "probability": svc_predict_proba})
             elif model == 'lstm':
                 lstm_predict, lstm_predict_proba = self.lstm_predict(l_text)
-                return jsonify({"result": lstm_predict, "probability": lstm_predict_proba})
+                result = jsonify({"result": lstm_predict, "probability": lstm_predict_proba})
             else:
                 svc_predict, svc_predict_proba = self.svc_predict(l_text)
                 lstm_predict, lstm_predict_proba = self.lstm_predict(l_text)
-                return jsonify(
+
+                result = jsonify(
                     {
                         "svc": {"result": svc_predict, "probability": svc_predict_proba},
                         "lstm": {"result": lstm_predict, "probability": lstm_predict_proba}
                      }
                 )
+
+            from keras import backend as K
+            K.clear_session()
+
+            return result
+
         except Exception as err:
             print(err)
             return jsonify({"error": str(err)})
